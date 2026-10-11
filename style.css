@@ -467,3 +467,24 @@ body {
     left: 50%;
     transform: translateX(-50%);
 }
+/* Static Pink Love Crown overlay */
+.heart-sticker-overlay { position:absolute; inset:0; z-index:5; pointer-events:none; }
+.heart-sticker-overlay .heart { position:absolute; line-height:1; filter:drop-shadow(0 2px 2px rgba(120,45,75,.22)); transform:translate(-50%,-50%); }
+.heart-one { left:34%; top:24%; font-size:clamp(20px,7vw,36px); }
+.heart-two { left:44%; top:20%; font-size:clamp(24px,9vw,44px); }
+.heart-three { left:55%; top:23%; font-size:clamp(28px,10vw,48px); }
+.heart-four { left:27%; top:29%; color:#ffb6d3; font-size:clamp(20px,6vw,30px); }
+.heart-five { left:72%; top:29%; font-size:clamp(20px,7vw,34px); }
+
+.preview-earth-girl {
+    background-color:#3d2922;
+    background-image: radial-gradient(#f3e6d2 3px, transparent 4px),
+      repeating-linear-gradient(0deg, transparent 0 13px, rgba(218,192,163,.22) 14px 16px),
+      repeating-linear-gradient(90deg, transparent 0 13px, rgba(218,192,163,.22) 14px 16px);
+    background-size:22px 22px, 100% 100%, 100% 100%;
+    background-position:right top, center, center;
+    border:5px solid #f4ecdf; position:relative; overflow:hidden;
+    box-shadow:inset 0 0 0 4px #cbb9a1;
+}
+.preview-earth-girl::before { content:"♡  ❀  ♡"; position:absolute; top:10px; left:0; right:0; color:#f4ecdf; font-size:22px; text-shadow:0 1px 2px #2d1c17; }
+.preview-earth-girl::after { content:"EARTH GIRL 🍂"; position:absolute; bottom:10px; left:5px; right:5px; color:#4b3027; background:#f4ecdf; border:2px dotted #c8b59a; font-size:10px; font-weight:700; padding:5px 0; }

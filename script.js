@@ -7,8 +7,12 @@ const state = {
     currentSlot: 0,
     photos: [null, null, null],
     currentFilter: 'original',
+    heartSticker: false,
     stream: null,
-    tempPhoto: null
+    tempPhoto: null,
+    faceLandmarks: null,
+    faceMesh: null,
+    faceTracking: false
 };
 
 const filterStyles = {
@@ -16,6 +20,9 @@ const filterStyles = {
     'soft-pink': 'sepia(0.2) saturate(1.2) hue-rotate(330deg) brightness(1.05)',
     dreamy: 'blur(0.5px) brightness(1.1) contrast(0.9) saturate(1.3)',
     vintage: 'sepia(0.5) contrast(1.1) brightness(0.9)',
+    'vintage-brown': 'sepia(0.38) saturate(0.82) contrast(1.04) brightness(1.04)',
+    'y2k-flash': 'saturate(1.22) contrast(1.12) brightness(1.08)',
+    'earthy-green': 'sepia(0.12) saturate(0.82) hue-rotate(18deg) contrast(1.03)',
     bubblegum: 'hue-rotate(300deg) saturate(1.5) brightness(1.1)',
     bw: 'grayscale(100%) contrast(1.2)'
 };
@@ -97,6 +104,7 @@ async function openCamera() {
         video.srcObject = state.stream;
 
         await video.play();
+        startFaceTracking(video);
 
     } catch (error) {
 
@@ -124,11 +132,72 @@ function stopCamera() {
 
     const video = document.getElementById('camera-video');
 
+    state.faceTracking = false;
+    state.faceLandmarks = null;
     if (video) {
         video.srcObject = null;
     }
 }
 
+
+// =========================
+// FACE TRACKING FOR PINK LOVE
+// Uses MediaPipe FaceMesh when the CDN is available.
+// If it is unavailable, the sticker keeps a gentle fixed-position fallback.
+// =========================
+
+async function startFaceTracking(video) {
+    state.faceTracking = true;
+    if (typeof FaceMesh === 'undefined') {
+        console.warn('FaceMesh unavailable; using fixed heart sticker position.');
+        return;
+    }
+    try {
+        if (!state.faceMesh) {
+            state.faceMesh = new FaceMesh({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+            state.faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            state.faceMesh.onResults(results => {
+                const landmarks = results.multiFaceLandmarks && results.multiFaceLandmarks[0];
+                state.faceLandmarks = landmarks || null;
+                if (landmarks) positionHeartSticker(landmarks);
+            });
+        }
+        const detect = async () => {
+            if (!state.faceTracking || !state.stream || video.readyState < 2) return;
+            try { await state.faceMesh.send({ image: video }); } catch (err) { console.warn('Face tracking frame skipped:', err); }
+            if (state.faceTracking) requestAnimationFrame(detect);
+        };
+        detect();
+    } catch (err) {
+        console.warn('Face tracking could not start:', err);
+    }
+}
+
+function positionHeartSticker(landmarks) {
+    const overlay = document.getElementById('heart-sticker-overlay');
+    const video = document.getElementById('camera-video');
+    if (!overlay || !video || !landmarks) return;
+    // FaceMesh point 10 is near the upper forehead; 234 and 454 estimate face width.
+    const forehead = landmarks[10];
+    const left = landmarks[234];
+    const right = landmarks[454];
+    const centerX = (1 - forehead.x) * video.clientWidth;
+    const centerY = forehead.y * video.clientHeight;
+    const faceWidth = Math.abs(right.x - left.x) * video.clientWidth;
+    const scale = Math.max(0.72, Math.min(1.45, faceWidth / 150));
+    const placements = [
+        ['.heart-one', -0.34, -0.12, 0.55], ['.heart-two', -0.16, -0.34, 0.72],
+        ['.heart-three', 0.08, -0.30, 0.82], ['.heart-four', -0.48, 0.02, 0.48],
+        ['.heart-five', 0.39, -0.02, 0.58]
+    ];
+    placements.forEach(([selector, dx, dy, size]) => {
+        const heart = overlay.querySelector(selector);
+        if (!heart) return;
+        heart.style.left = `${centerX + faceWidth * dx}px`;
+        heart.style.top = `${centerY + faceWidth * dy}px`;
+        heart.style.fontSize = `${Math.max(15, faceWidth * size * 0.22)}px`;
+    });
+}
 
 // =========================
 // FILTER
@@ -151,6 +220,12 @@ function setFilter(filterName, button) {
     }
 }
 
+
+function toggleHeartSticker(button) {
+    state.heartSticker = !state.heartSticker;
+    document.getElementById('heart-sticker-overlay').classList.toggle('hidden', !state.heartSticker);
+    button.classList.toggle('active', state.heartSticker);
+}
 
 // =========================
 // CAMERA UI
@@ -177,6 +252,8 @@ function resetCameraUI() {
     const video = document.getElementById('camera-video');
 
     video.style.filter = filterStyles[state.currentFilter];
+    const heartOverlay = document.getElementById('heart-sticker-overlay');
+    if (heartOverlay) heartOverlay.classList.toggle('hidden', !state.heartSticker);
 }
 
 
@@ -276,6 +353,12 @@ function captureCanvas() {
         canvas.height
     );
 
+    if (state.heartSticker) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.filter = 'none';
+        drawHeartCrown(ctx, canvas.width, canvas.height, state.faceLandmarks);
+    }
+
     video.pause();
 
     state.tempPhoto = canvas.toDataURL(
@@ -300,6 +383,28 @@ function captureCanvas() {
         .remove('hidden');
 }
 
+
+function drawHeartCrown(ctx, w, h, landmarks) {
+    let cx = w * 0.5, cy = h * 0.24, faceWidth = w * 0.42;
+    if (landmarks && landmarks[10] && landmarks[234] && landmarks[454]) {
+        const forehead = landmarks[10], left = landmarks[234], right = landmarks[454];
+        cx = (1 - forehead.x) * w;
+        cy = forehead.y * h - h * 0.045;
+        faceWidth = Math.abs(right.x - left.x) * w;
+    }
+    const hearts = [
+        [-0.34, -0.02, 0.16, '💗'], [-0.17, -0.20, 0.20, '💖'],
+        [0.04, -0.24, 0.23, '💕'], [0.25, -0.12, 0.17, '💗'],
+        [-0.46, 0.09, 0.13, '♡'], [0.42, 0.08, 0.13, '♡']
+    ];
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    hearts.forEach(([dx, dy, size, text]) => {
+        ctx.font = `${Math.round(faceWidth * size)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+        ctx.fillText(text, cx + faceWidth * dx, cy + faceWidth * dy);
+    });
+    ctx.restore();
+}
 
 // =========================
 // RETAKE
@@ -1460,6 +1565,28 @@ function drawFrameBackground(
 
         ctx.stroke();
     }
+    else if (frameType === 'earth-girl') {
+        // Dark chocolate plaid base inspired by the user's lace-and-polka-dot reference.
+        ctx.fillStyle = '#35211c'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#4a3028'; ctx.fillRect(0, 0, w * 0.88, h);
+        ctx.strokeStyle = 'rgba(215,190,160,0.16)'; ctx.lineWidth = 8;
+        for (let x = 0; x < w * 0.88; x += 48) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+        for (let y = 0; y < h; y += 48) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w * 0.88, y); ctx.stroke(); }
+        ctx.strokeStyle = 'rgba(25,12,10,0.32)'; ctx.lineWidth = 18;
+        for (let x = 18; x < w * 0.88; x += 96) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+        // Cream polka dots on the right panel.
+        ctx.fillStyle = '#f2e5d0';
+        for (let y = 24; y < h; y += 118) for (let x = w * 0.91; x < w; x += 92) { ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2); ctx.fill(); }
+        // Lace trim along the left edge.
+        ctx.fillStyle = '#f5eee1'; ctx.fillRect(0, 0, 42, h);
+        ctx.strokeStyle = '#e6dac7'; ctx.lineWidth = 5;
+        for (let y = 0; y < h; y += 32) { ctx.beginPath(); ctx.arc(20, y, 14, -Math.PI / 2, Math.PI / 2); ctx.stroke(); }
+        drawFlower(ctx, 108, 145, 0.72, '#d7c4a6');
+        drawFlower(ctx, w * 0.78, h - 140, 0.78, '#e9d8bd');
+        ctx.fillStyle = '#f4eadb'; ctx.font = 'bold 52px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('♡', w * 0.48, 125);
+    }
+
 }
 
 
@@ -1759,6 +1886,30 @@ function drawSlotDecorations(
     }
 
 
+    else if (frameType === 'earth-girl') {
+        // Cream lace-like frame: double border + scalloped loops on all four sides.
+        const x = slot.x - 34, y = slot.y - 34, w = slot.w + 68, h = slot.h + 68;
+        // IMPORTANT: keep the photo area transparent here. The previous fillRect
+        // painted cream over the photo that had just been drawn, making every slot blank.
+        // Draw only the lace/border outside the photo area.
+        ctx.strokeStyle = '#d8cbb8'; ctx.lineWidth = 5; ctx.strokeRect(x + 12, y + 12, w - 24, h - 24);
+        ctx.strokeStyle = '#fffaf0'; ctx.lineWidth = 8;
+        const step = 30;
+        for (let px = x + 10; px < x + w - 8; px += step) {
+            ctx.beginPath(); ctx.arc(px, y + 13, 12, Math.PI, 0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(px, y + h - 13, 12, 0, Math.PI); ctx.stroke();
+        }
+        for (let py = y + 10; py < y + h - 8; py += step) {
+            ctx.beginPath(); ctx.arc(x + 13, py, 12, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+            ctx.beginPath(); ctx.arc(x + w - 13, py, 12, Math.PI / 2, -Math.PI / 2); ctx.stroke();
+        }
+        ctx.fillStyle = '#f0e3cf';
+        [[x+18,y+18],[x+w-18,y+18],[x+18,y+h-18],[x+w-18,y+h-18]].forEach(([cx,cy]) => { ctx.beginPath(); ctx.arc(cx,cy,20,0,Math.PI*2); ctx.fill(); });
+        ctx.fillStyle = '#f4e6d3'; ctx.font = '70px Arial';
+        ctx.fillText('❀', x + w - 4, y + h * 0.48);
+        ctx.fillText('❀', x + 8, y + h - 4);
+    }
+
     ctx.restore();
 }
 
@@ -1963,6 +2114,13 @@ function drawFrameOverlays(
             2180
         );
     }
+    else if (frameType === 'earth-girl') {
+        ctx.font = 'bold 76px Arial'; ctx.fillStyle = '#596247';
+        ctx.fillText('EARTH GIRL', w / 2, 145);
+        ctx.font = '42px Arial'; ctx.fillStyle = '#6d7654';
+        ctx.fillText('soft days, wild heart ❧', w / 2, h - 75);
+    }
+
 }
 
 

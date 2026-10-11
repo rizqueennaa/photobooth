@@ -54,6 +54,11 @@
         <p>Love You In Every Universe</p>
     </div>
 
+    <div class="frame-card" data-frame="earth-girl" onclick="selectFrame(this)">
+        <div class="frame-preview preview-earth-girl"><span>🍂</span></div>
+        <p>Earth Girl</p>
+    </div>
+
 </div>
             <button id="btn-continue-frame" class="btn primary mt-auto" onclick="startPhotoSession()" disabled>CONTINUE &rarr;</button>
         </div>
@@ -80,6 +85,11 @@
             <h3 class="scrapbook-font text-center">Strike a pose! ✨</h3>
             <div class="camera-container">
                 <video id="camera-video" autoplay playsinline></video>
+                <div id="heart-sticker-overlay" class="heart-sticker-overlay hidden" aria-hidden="true">
+                    <span class="heart heart-one">💗</span><span class="heart heart-two">💖</span>
+                    <span class="heart heart-three">💕</span><span class="heart heart-four">♡</span>
+                    <span class="heart heart-five">💗</span>
+                </div>
                 <div id="countdown-display" class="hidden scrapbook-font">3</div>
                 <div id="flash-effect" class="hidden"></div>
             </div>
@@ -89,8 +99,12 @@
                 <button class="filter-btn" onclick="setFilter('soft-pink')">Soft Pink</button>
                 <button class="filter-btn" onclick="setFilter('dreamy')">Dreamy</button>
                 <button class="filter-btn" onclick="setFilter('vintage')">Vintage</button>
+                <button class="filter-btn" onclick="setFilter('vintage-brown')">Vintage Brown 🤎</button>
+                <button class="filter-btn" onclick="setFilter('y2k-flash')">Y2K Flash 💿</button>
+                <button class="filter-btn" onclick="setFilter('earthy-green')">Earthy Green 🌿</button>
                 <button class="filter-btn" onclick="setFilter('bubblegum')">Bubblegum</button>
                 <button class="filter-btn" onclick="setFilter('bw')">B & W</button>
+                <button class="filter-btn" id="heart-filter-btn" onclick="toggleHeartSticker(this)">💗 Pink Love</button>
             </div>
 
             <div class="camera-controls">
@@ -133,6 +147,7 @@
         <!-- Hidden canvas for processing -->
         <canvas id="process-canvas" class="hidden"></canvas>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
